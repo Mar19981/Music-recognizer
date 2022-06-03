@@ -8,3 +8,14 @@ Authors:
 * Sebastian Richter
 * Piotr Sorociak
 * Jakub Węgrzynowski
+
+# Requirements
+In order to open MP3 files ffmpeg is required. https://ffmpeg.org/download.html#build-windows
+Download the archive, unpack the contained binaries to desired location and add it to PATH environment variable.
+
+# Launching and generating database
+
+To launch an application simply run the *run.bat* file.  
+To generate new database launch *createdb.bat* file from command line as follows:  
+         createdb.bat *data_path*   
+

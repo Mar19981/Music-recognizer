@@ -6,10 +6,14 @@ name = "pypi"
 [packages]
 pyside6 = "*"
 sounddevice = "*"
-tensorflow = "*"
 matplotlib = "*"
-tensorflow-io = "*"
 numpy = "*"
+pyaudio = {path = "./dependencies/PyAudio-0.2.11-cp310-cp310-win_amd64.whl"}
+librosa = "*"
+ffmpeg = "*"
+mutagen = "*"
+sqlalchemy = "*"
+scipy = "*"
 
 [dev-packages]
 

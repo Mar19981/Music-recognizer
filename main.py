@@ -1,9 +1,13 @@
 import sys
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from window import MainWindow
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
+    try:
+        app = QApplication(sys.argv)
+        window = MainWindow()
+        window.show()
+    except RuntimeError as err:
+        QMessageBox.critical(window, "Error", err)
+    finally:
+        sys.exit(app.exec())
