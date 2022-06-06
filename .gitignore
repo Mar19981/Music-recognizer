@@ -131,3 +131,4 @@ data
 /data.zip
 /*.flac
 /*.pickle
+/*.db

@@ -5,7 +5,7 @@ import scipy.fft, scipy.signal
 
 
 class Recording:
-    def __init__(self, frequency: int = 44100, channels = 2, duration = 5):
+    def __init__(self, frequency: int = 44100, channels = 1, duration = 5):
         self.__data = None
         self.__duration = duration
         self.__frequency = frequency
@@ -21,12 +21,8 @@ class Recording:
 
     def record(self):
         self.__data = sd.rec(int(self.__duration * self.__frequency), self.__frequency, self.__channels)
-        # self.__data = librosa.audio.to_mono(self.__data)
-        # self.__data = librosa.util.normalize(self.__data)
         
     def play(self):
-        # with sd.OutputStream(samplerate = self.__frequency, channels = self.__channels, callback = callback, finished_callback = finishCallback) as stream:
-        #     sd.wait()
         sd.play(self.__data)
         
     def load(self, path: str):
@@ -34,7 +30,9 @@ class Recording:
         self.__data = input
         if self.__duration != 0:
             self.__data = self.__data[:self.__duration * self.__frequency]
-    def normalize(self):
+            
+    def prepareRecording(self):
+        self.__data = self.__data.flatten()
         self.__data = librosa.util.normalize(self.__data)
     
     def plotFFT(self, plt):

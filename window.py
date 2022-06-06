@@ -13,7 +13,7 @@ class RecordingWorker(QObject):
     def run(self) -> None:
         self._recording.record()
         sd.wait()
-        self._recording.normalize()
+        self._recording.prepareRecording()
         self.finished.emit()
         
 class PlayWorker(RecordingWorker):
@@ -98,8 +98,13 @@ class MainWindow(QMainWindow):
         self.playButton.clicked.connect(self.play)
         self.loadButton.clicked.connect(self.loadFile)
         self.rec = Recording()
+        
+        print("UI setup complete")
+        print("Loading songs.pickle")
         self.songsIndecies = pickle.load(open("songs.pickle", "rb"))
+        print("Loading db.pickle")
         self.songsHashes = pickle.load(open("db.pickle", "rb"))
+        print("Setup finished")
         
 
     def createThread(self, workerType: WorkerType, finishCallback):
@@ -127,6 +132,7 @@ class MainWindow(QMainWindow):
         
     def play(self):
         print(self.rec.data)
+        print(self.rec.data.shape)
         if self.rec.data is None: 
             return
         self.createThread(WorkerType.PLAY, self.endPlaying)
@@ -154,6 +160,7 @@ class MainWindow(QMainWindow):
     def loadFile(self):
         path, _ = QFileDialog.getOpenFileName(self, u"Open file", os.getcwd(), "Audio file (*.wav *.wave *.flac *.mp3 *.aac *.m4a *.ogg *.oga);;WAV(*.wav *.wave);;FLAC(*.flac);;MP3(*.mp3);;AAC(*.aac *.m4a);;OGG Vorbis(*.ogg *.oga)")
         self.rec.load(path)
+        print(self.rec.data)
         self.rec.generateHash(self.fingerprintWidget.axes)
         self.recognizeSong()
         self.__updatePlots()
