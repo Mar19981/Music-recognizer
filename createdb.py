@@ -1,14 +1,13 @@
-import os, sys, mutagen, pickle
+import os, sys, mutagen, pickle, time, datetime
 from typing import Dict, Tuple, List
 from recording import Recording
 from database import Database
-from models import Song, Hash
+from models import Song, Hash, Association
 
 def createPickleFiles(fileList: list[str]):
-    index = 0
     songNameIndex: Dict[int, Tuple[str, str, str]] = {}
     db: Dict[int, List[Tuple[int, int]]] = {}
-    for file in fileList:
+    for index, file in enumerate(fileList):
         audioFile = mutagen.File(file)
         songNameIndex[index] = (audioFile['artist'][0], audioFile['title'][0], audioFile['album'][0] if 'album' in audioFile else '')
         rec = Recording(duration=0)
@@ -19,7 +18,7 @@ def createPickleFiles(fileList: list[str]):
                 db[hash] = []
             db[hash].append(timeIndexPair)
         print(f"File {index}: {audioFile['artist'][0]} - {audioFile['album'][0] if 'album' in audioFile else ''} - {audioFile['title'][0]}")
-        index += 1  
+ 
     print("Generating db.pickle file...")
     with open("db.pickle", "wb") as dbOutput:
         pickle.dump(db, dbOutput, pickle.HIGHEST_PROTOCOL)
@@ -41,14 +40,14 @@ def createSqlDatabase(fileList: list[str]):
             artist = audioFile['artist'][0], 
             title = audioFile['title'][0], 
             album = audioFile['album'][0] if 'album' in audioFile else '',
-            hashes = [Hash(hash=hash, time=timeIndexPair[0]) for hash, timeIndexPair in rec.fingerprint.items()]
+            hashes = []
             )
-        db.addSong(song)
+        db.addSong(song, rec.fingerprint.items())
         print(f"File {index}: {audioFile['artist'][0]} - {audioFile['album'][0] if 'album' in audioFile else ''} - {audioFile['title'][0]}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[2].lower() not in ("pickle", "sql"):
+    if len(sys.argv) not in (2, 3) or sys.argv[2].lower() not in ("pickle", "sql"):
         print("Invalid args!")
         sys.exit(1)
     fileList = []
@@ -57,12 +56,14 @@ if __name__ == "__main__":
             if file.endswith(".flac"):
                 path = os.path.join(root, file)
                 fileList.append(path)
-    
-    match(sys.argv[2].lower()):
+                
+    start = time.perf_counter()
+    arg = sys.argv[2].lower() if len(sys.argv) == 3 else "pickle"
+    match(arg):
         case "pickle":
             createPickleFiles(fileList)
         case "sql":
             createSqlDatabase(fileList)
-            
-        
-    print("Done!")
+    finish = time.perf_counter()
+             
+    print(f"Done in {str(datetime.timedelta(seconds = finish - start))}!")

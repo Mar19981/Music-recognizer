@@ -1,35 +1,58 @@
-import enum, sounddevice as sd, os, pickle
+import enum, sounddevice as sd, os, pickle, json
 from recording import Recording
 from PlotWidget import PlotWidget
-from PySide6.QtWidgets import QMainWindow, QGridLayout, QPushButton, QProgressBar, QVBoxLayout, QHBoxLayout, QLabel, QWidget, QFileDialog
+from PySide6.QtWidgets import (QMainWindow, QGridLayout, QPushButton, QProgressBar, 
+                               QVBoxLayout, QHBoxLayout, QLabel, QWidget, QFileDialog,
+                               QListWidget, QListWidgetItem, QStackedWidget, QCheckBox)
 from PySide6.QtCore import QObject, Signal, QThread, QSize
+from PySide6.QtGui import QPalette
 
 #Classes for pararel task execution
 class RecordingWorker(QObject):
     finished = Signal(None)
-    def __init__(self, recording: Recording):
+    def __init__(self, w):
         super(RecordingWorker, self).__init__()
-        self._recording = recording
+        self._parent = w
     def run(self) -> None:
-        self._recording.record()
+        self._parent.rec.record()
         sd.wait()
-        self._recording.prepareRecording()
+        self._parent.rec.prepareRecording()
         self.finished.emit()
         
 class PlayWorker(RecordingWorker):
     progress = Signal(int)
-    def __init__(self, recording: Recording):
-        super(PlayWorker, self).__init__(recording)
+    def __init__(self, w):
+        super(PlayWorker, self).__init__(w)
     
     def run(self) -> None:
-        self._recording.play()
+        self._parent.rec.play()
         sd.wait()
+        self.finished.emit()
+        
+class LoadWorker(RecordingWorker):
+    def __init__(self, w):
+        super(LoadWorker, self).__init__(w)
+    
+    def run(self) -> None:
+        self._parent.loadFile()
+        self.finished.emit()
+        
+class DataLoadWorker(RecordingWorker):
+    def __init__(self, w):
+        super(DataLoadWorker, self).__init__(w)
+    
+    def run(self) -> None:
+        self._parent.songLabel.setText("Loading database...")
+        self._parent.songsHashes = pickle.load(open("db.pickle", "rb"))
+        self._parent.songsIndecies = pickle.load(open("songs.pickle", "rb"))
         self.finished.emit()
         
 
 class WorkerType(enum.Enum):
     RECORD = enum.auto()
     PLAY = enum.auto()
+    LOAD = enum.auto()
+    LOAD_DB = enum.auto()
 
 #GUI class
 class MainWindow(QMainWindow):
@@ -38,15 +61,16 @@ class MainWindow(QMainWindow):
         
         self.resize(1200, 600)
         
+        
         widget = QWidget()
         self.songLabel = QLabel()
-        self.inputLabel = QLabel()
-        self.fftLabel = QLabel()
-        self.fingerprintLabel = QLabel()
+        
+        self.resultsList = QListWidget()
 
         audioLayout = QVBoxLayout()
         audioLayout.setContentsMargins(0, 0, 0, 0)
         buttonsLayout = QHBoxLayout()
+        plotButtonsLayout = QHBoxLayout()
 
         self.startButton = QPushButton()
 
@@ -60,59 +84,89 @@ class MainWindow(QMainWindow):
 
         buttonsLayout.addWidget(self.loadButton)
 
-
+        self.inputButton = QPushButton()
+        plotButtonsLayout.addWidget(self.inputButton)        
+        self.fftButton = QPushButton()
+        plotButtonsLayout.addWidget(self.fftButton)        
+        self.fingerprintButton = QPushButton()
+        plotButtonsLayout.addWidget(self.fingerprintButton)
+        
+        self.exportButton = QPushButton()
+        self.exportButton.setText(u"Export results")
+        
+        self.correctCheck = QCheckBox()
+        self.correctCheck.setText(u"Correct")
+        self.correctCheck.setEnabled(False)
+        
         audioLayout.addLayout(buttonsLayout)
 
         
         self.inputWidget = PlotWidget()
         self.ftWidget = PlotWidget()
         self.fingerprintWidget = PlotWidget()
-        
+        self.stackedWidget = QStackedWidget()
+        self.stackedWidget.addWidget(self.inputWidget)
+        self.stackedWidget.addWidget(self.ftWidget)
+        self.stackedWidget.addWidget(self.fingerprintWidget)
         
         layout = QGridLayout()
         
-        layout.addWidget(self.inputWidget, 1, 0, 1, 1)
-        layout.addWidget(self.ftWidget, 1, 1, 1, 1)
-        layout.addWidget(self.fingerprintWidget, 1, 2, 1, 1)
+        layout.addWidget(self.stackedWidget, 1, 0, 1, 1)
         layout.addWidget(self.songLabel, 2, 0)
-        layout.addWidget(self.inputLabel, 0, 0, 1, 1)
-        layout.addWidget(self.fftLabel, 0, 1, 1, 1)
-        layout.addWidget(self.fingerprintLabel, 0, 2, 1, 1)
         layout.addLayout(audioLayout, 3, 0)
+        layout.addLayout(plotButtonsLayout, 0, 0, 1, 1)
+        layout.addWidget(self.resultsList, 0, 1, 2, 1)
+        layout.addWidget(self.correctCheck, 2, 1, 1, 1)
+        layout.addWidget(self.exportButton, 3, 1, 1, 1)
+        
         
         widget.setLayout(layout)
         self.setCentralWidget(widget)
         
         self.setWindowTitle("Music recognizer")
-        self.songLabel.setText(u"Song:")
-        self.inputLabel.setText(u"Input:")
-        self.fftLabel.setText(u"FFT:")
-        self.fingerprintLabel.setText(u"Fingerprint:")
+        self.songLabel.setText(u"Loading database...")
         self.startButton.setText(u"Start recording")
         self.playButton.setText(u"Play recording")
         self.loadButton.setText(u"Load music")
+        self.inputButton.setText(u"Input")
+        self.fftButton.setText(u"Fourier transform")
+        self.fingerprintButton.setText(u"Fingerprint")
+                
+        self.startButton.setEnabled(False)
+        self.playButton.setEnabled(False)
+        self.loadButton.setEnabled(False)
         
         #signals
         
         self.startButton.clicked.connect(self.record)
         self.playButton.clicked.connect(self.play)
-        self.loadButton.clicked.connect(self.loadFile)
-        self.rec = Recording()
+        self.loadButton.clicked.connect(self.loadFile)        
+        self.inputButton.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(0))
+        self.fftButton.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(1))
+        self.fingerprintButton.clicked.connect(lambda: self.stackedWidget.setCurrentIndex(2))
+        self.correctCheck.stateChanged.connect(self.correctnessChanged)
+        self.exportButton.clicked.connect(self.export)
+        self.resultsList.currentRowChanged.connect(self.resultSelected)
         
-        print("UI setup complete")
-        print("Loading songs.pickle")
-        self.songsIndecies = pickle.load(open("songs.pickle", "rb"))
-        print("Loading db.pickle")
-        self.songsHashes = pickle.load(open("db.pickle", "rb"))
-        print("Setup finished")
+        self.rec = Recording()
+        self.results = {}
+        self.currentIndex = 0
+        
+        self.createThread(WorkerType.LOAD_DB, self.dataLoadingFinished)
+        self.thread.start()
+        
         
 
     def createThread(self, workerType: WorkerType, finishCallback):
         match workerType:
             case WorkerType.RECORD:
-                self.worker = RecordingWorker(self.rec)
+                self.worker = RecordingWorker(self)
             case WorkerType.PLAY:
-                self.worker = PlayWorker(self.rec)
+                self.worker = PlayWorker(self)
+            case WorkerType.LOAD:
+                self.worker = LoadWorker(self)            
+            case WorkerType.LOAD_DB:
+                self.worker = DataLoadWorker(self)
                 
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
@@ -120,7 +174,8 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(self.worker.deleteLater)
         self.worker.finished.connect(self.thread.quit)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.finished.connect(finishCallback)
+        if finishCallback is not None:
+            self.thread.finished.connect(finishCallback)
 
     def record(self):
         devices = sd.query_devices(kind="input")
@@ -131,8 +186,6 @@ class MainWindow(QMainWindow):
         self.thread.start()
         
     def play(self):
-        print(self.rec.data)
-        print(self.rec.data.shape)
         if self.rec.data is None: 
             return
         self.createThread(WorkerType.PLAY, self.endPlaying)
@@ -156,16 +209,29 @@ class MainWindow(QMainWindow):
         
     def endPlaying(self):
         self.playButton.setEnabled(True)
-        
+    
+    def dataLoadingFinished(self):
+        self.startButton.setEnabled(True)
+        self.playButton.setEnabled(True)
+        self.loadButton.setEnabled(True)
+        self.songLabel.setText("Database loading finished!")
+    
+    def load(self):
+        self.createThread(WorkerType.LOAD, None)
+        self.thread.start()
+    
     def loadFile(self):
         path, _ = QFileDialog.getOpenFileName(self, u"Open file", os.getcwd(), "Audio file (*.wav *.wave *.flac *.mp3 *.aac *.m4a *.ogg *.oga);;WAV(*.wav *.wave);;FLAC(*.flac);;MP3(*.mp3);;AAC(*.aac *.m4a);;OGG Vorbis(*.ogg *.oga)")
-        self.rec.load(path)
-        print(self.rec.data)
-        self.rec.generateHash(self.fingerprintWidget.axes)
-        self.recognizeSong()
-        self.__updatePlots()
+        if path != "":
+            self.rec.load(path)
+            self.rec.generateHash(self.fingerprintWidget.axes)
+            self.recognizeSong()
+            self.__updatePlots()
     
     def recognizeSong(self):
+
+        self.songLabel.setText("Recognizing song...")
+        
         matchesPerSong = {}
         for hash, (sampleTime, _) in self.rec.fingerprint.items():
             if hash in self.songsHashes:
@@ -195,7 +261,35 @@ class MainWindow(QMainWindow):
         
         artist, title, album = self.songsIndecies[songId]
         
-        self.songLabel.setText(f"Song: {artist} - {title} [Album: {album}]") 
+        self.songLabel.setText(f"Song: {artist} - {title} [Album: {album}]")
+        
+        item = QListWidgetItem()
+        item.setText(f"{artist} - {title} [Album: {album}]")
+        self.resultsList.addItem(item)
+        if not self.results:
+            self.correctCheck.setEnabled(True)
+        self.results[self.currentIndex] = True
+        self.correctCheck.setChecked(True)
+        self.currentIndex += 1
+            
+        
+    def export(self):
+        print(self.results)
+        path, _ = QFileDialog.getSaveFileName(self, "Save results", os.getcwd(), "JSON(*.json)")
+        if path != "":
+            with open(path, "w") as output:
+                json.dump(self.results, output)
+    
+    def resultSelected(self, item):
+        if self.currentIndex is None:
+            self.correctCheck.setEnabled(True)
+        self.correctCheck.setChecked(self.results[item])
+        self.currentIndex = item
+        
+    def correctnessChanged(self, state):
+         self.results[self.resultsList.currentRow()] = bool(state)
+        
+        
         
         
         
