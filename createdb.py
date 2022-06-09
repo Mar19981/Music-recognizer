@@ -53,7 +53,7 @@ if __name__ == "__main__":
     fileList = []
     for root, _, files in os.walk(sys.argv[1]):
         for file in files:
-            if file.endswith(".flac"):
+            if file.endswith(".flac") or file.endswith(".wav") or file.endswith(".mp3"):
                 path = os.path.join(root, file)
                 fileList.append(path)
                 
