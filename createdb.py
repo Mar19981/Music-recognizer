@@ -9,7 +9,11 @@ def createPickleFiles(fileList: list[str]):
     db: Dict[int, List[Tuple[int, int]]] = {}
     for index, file in enumerate(fileList):
         audioFile = mutagen.File(file)
-        songNameIndex[index] = (audioFile['artist'][0], audioFile['title'][0], audioFile['album'][0] if 'album' in audioFile else '')
+        print(file)
+        artist = audioFile['artist'][0] if 'artist' in audioFile else input("Artist: ")
+        title = audioFile['title'][0] if 'title' in audioFile else input("Title: ")
+        album = audioFile['album'][0] if 'album' in audioFile else input("Album: ")
+        songNameIndex[index] = (artist, title, album)
         rec = Recording(duration=0)
         rec.load(file)
         rec.generateHash(id=index)
@@ -17,7 +21,7 @@ def createPickleFiles(fileList: list[str]):
             if hash not in db:
                 db[hash] = []
             db[hash].append(timeIndexPair)
-        print(f"File {index}: {audioFile['artist'][0]} - {audioFile['album'][0] if 'album' in audioFile else ''} - {audioFile['title'][0]}")
+        print(f"File {index}: {artist} - {album} - {title}")
  
     print("Generating db.pickle file...")
     with open("db.pickle", "wb") as dbOutput:
@@ -47,7 +51,7 @@ def createSqlDatabase(fileList: list[str]):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or sys.argv[2].lower() not in ("pickle", "sql"):
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2].lower() not in ("pickle", "sql")):
         print("Invalid args!")
         sys.exit(1)
     fileList = []
