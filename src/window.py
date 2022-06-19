@@ -3,14 +3,14 @@ from recording import Recording
 from PlotWidget import PlotWidget
 from PySide6.QtWidgets import (QMainWindow, QGridLayout, QPushButton, QProgressBar, 
                                QVBoxLayout, QHBoxLayout, QLabel, QWidget, QFileDialog,
-                               QListWidget, QListWidgetItem, QStackedWidget, QCheckBox)
+                               QListWidget, QListWidgetItem, QStackedWidget, QCheckBox
+                               )
 from PySide6.QtCore import QObject, Signal, QThread, QSize
-from PySide6.QtGui import QPalette
 
 #Classes for pararel task execution
 class RecordingWorker(QObject):
     finished = Signal(None)
-    def __init__(self, w):
+    def __init__(self, w) -> None:
         super(RecordingWorker, self).__init__()
         self._parent = w
     def run(self) -> None:
@@ -21,7 +21,7 @@ class RecordingWorker(QObject):
         
 class PlayWorker(RecordingWorker):
     progress = Signal(int)
-    def __init__(self, w):
+    def __init__(self, w) -> None:
         super(PlayWorker, self).__init__(w)
     
     def run(self) -> None:
@@ -30,7 +30,7 @@ class PlayWorker(RecordingWorker):
         self.finished.emit()
         
 class LoadWorker(RecordingWorker):
-    def __init__(self, w):
+    def __init__(self, w) -> None:
         super(LoadWorker, self).__init__(w)
     
     def run(self) -> None:
@@ -38,13 +38,13 @@ class LoadWorker(RecordingWorker):
         self.finished.emit()
         
 class DataLoadWorker(RecordingWorker):
-    def __init__(self, w):
+    def __init__(self, w) -> None:
         super(DataLoadWorker, self).__init__(w)
     
     def run(self) -> None:
-        self._parent.songLabel.setText("Loading database...")
-        self._parent.songsHashes = pickle.load(open("db.pickle", "rb"))
-        self._parent.songsIndecies = pickle.load(open("songs.pickle", "rb"))
+        self._parent.songLabel.setText(u"Loading database...")
+        self._parent.songsHashes = pickle.load(open("data/db.pickle", "rb"))
+        self._parent.songsIndecies = pickle.load(open("data/songs.pickle", "rb"))
         self.finished.emit()
         
 
@@ -56,7 +56,7 @@ class WorkerType(enum.Enum):
 
 #GUI class
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self) -> None:
         super(MainWindow, self).__init__()
         
         self.resize(1200, 600)
@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self.correctCheck = QCheckBox()
         self.correctCheck.setText(u"Correct")
         self.correctCheck.setEnabled(False)
+        self.correctCheck.setChecked(True)
         
         audioLayout.addLayout(buttonsLayout)
 
@@ -123,7 +124,7 @@ class MainWindow(QMainWindow):
         widget.setLayout(layout)
         self.setCentralWidget(widget)
         
-        self.setWindowTitle("Music recognizer")
+        self.setWindowTitle(u"Music recognizer")
         self.songLabel.setText(u"Loading database...")
         self.startButton.setText(u"Start recording")
         self.playButton.setText(u"Play recording")
@@ -150,7 +151,7 @@ class MainWindow(QMainWindow):
         
         self.rec = Recording()
         self.results = {}
-        self.currentIndex = 0
+        self.currentIndex = None
         
         self.createThread(WorkerType.LOAD_DB, self.dataLoadingFinished)
         self.thread.start()
@@ -177,7 +178,7 @@ class MainWindow(QMainWindow):
         if finishCallback is not None:
             self.thread.finished.connect(finishCallback)
 
-    def record(self):
+    def record(self) -> None:
         devices = sd.query_devices(kind="input")
         if not devices: 
             raise RuntimeError("Failed to find input devices")
@@ -185,20 +186,20 @@ class MainWindow(QMainWindow):
         self.startButton.setEnabled(False)
         self.thread.start()
         
-    def play(self):
+    def play(self) -> None:
         if self.rec.data is None: 
             return
         self.createThread(WorkerType.PLAY, self.endPlaying)
         self.playButton.setEnabled(False)
         self.thread.start()
     
-    def endRecording(self):
+    def endRecording(self) -> None:
         self.startButton.setEnabled(True)
         self.rec.generateHash(self.fingerprintWidget.axes)
         self.recognizeSong()
         self.__updatePlots()
         
-    def __updatePlots(self):
+    def __updatePlots(self) -> None:
         self.inputWidget.axes.cla()
         self.inputWidget.axes.plot(self.rec.data)
         self.ftWidget.axes.cla()
@@ -207,20 +208,20 @@ class MainWindow(QMainWindow):
         self.ftWidget.draw()
         self.fingerprintWidget.draw()
         
-    def endPlaying(self):
+    def endPlaying(self) -> None:
         self.playButton.setEnabled(True)
     
-    def dataLoadingFinished(self):
+    def dataLoadingFinished(self) -> None:
         self.startButton.setEnabled(True)
         self.playButton.setEnabled(True)
         self.loadButton.setEnabled(True)
         self.songLabel.setText("Database loading finished!")
     
-    def load(self):
+    def load(self) -> None:
         self.createThread(WorkerType.LOAD, None)
         self.thread.start()
     
-    def loadFile(self):
+    def loadFile(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, u"Open file", os.getcwd(), "Audio file (*.wav *.wave *.flac *.mp3 *.aac *.m4a *.ogg *.oga);;WAV(*.wav *.wave);;FLAC(*.flac);;MP3(*.mp3);;AAC(*.aac *.m4a);;OGG Vorbis(*.ogg *.oga)")
         if path != "":
             self.rec.load(path)
@@ -228,9 +229,9 @@ class MainWindow(QMainWindow):
             self.recognizeSong()
             self.__updatePlots()
     
-    def recognizeSong(self):
+    def recognizeSong(self) -> None:
 
-        self.songLabel.setText("Recognizing song...")
+        self.songLabel.setText(u"Recognizing song...")
         
         matchesPerSong = {}
         for hash, (sampleTime, _) in self.rec.fingerprint.items():
@@ -257,7 +258,7 @@ class MainWindow(QMainWindow):
         
         scores = list(sorted(scores.items(), key=lambda x: x[1][1], reverse=True))
         
-        songId, _ = scores[0]
+        songId, score = scores[0]
         
         artist, title, album = self.songsIndecies[songId]
         
@@ -265,29 +266,50 @@ class MainWindow(QMainWindow):
         
         item = QListWidgetItem()
         item.setText(f"{artist} - {title} [Album: {album}]")
-        self.resultsList.addItem(item)
         if not self.results:
             self.correctCheck.setEnabled(True)
-        self.results[self.currentIndex] = True
-        self.correctCheck.setChecked(True)
-        self.currentIndex += 1
+            
+        result = {
+            "correct" : True,
+            "matches" : [{
+                "artist": artist,
+                "title": title,
+                "album": album,
+                "score": score[1],
+                "offset": score[0]
+            }]
+        }
+        for i in range(1, 5):
+            songId, score = scores[i]
+            artist, title, album = self.songsIndecies[songId]
+            match = {
+                "artist": artist,
+                "title": title,
+                "album": album,
+                "score": score[1],
+                "offset": score[0]
+            }
+            result["matches"].append(match)
+            
+            
+            
+        self.results[self.resultsList.count()] = result
+        self.resultsList.addItem(item)
             
         
-    def export(self):
-        print(self.results)
+    def export(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, "Save results", os.getcwd(), "JSON(*.json)")
         if path != "":
             with open(path, "w") as output:
                 json.dump(self.results, output)
     
-    def resultSelected(self, item):
-        if self.currentIndex is None:
-            self.correctCheck.setEnabled(True)
-        self.correctCheck.setChecked(self.results[item])
+    def resultSelected(self, item: int) -> None:
+        self.correctCheck.setChecked(self.results[item]["correct"])
         self.currentIndex = item
         
-    def correctnessChanged(self, state):
-         self.results[self.resultsList.currentRow()] = bool(state)
+    def correctnessChanged(self, state) -> None:
+        if self.results and self.currentIndex is not None:
+            self.results[self.resultsList.currentRow() if self.resultsList.currentRow() >= 0 else 0]["correct"] = self.correctCheck.isChecked()
         
         
         

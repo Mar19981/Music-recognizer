@@ -1,11 +1,8 @@
-import sounddevice as sd
-import librosa
-import numpy as np
-import scipy.fft, scipy.signal
+import sounddevice as sd, librosa, numpy as np, scipy.fft, scipy.signal
 
 
 class Recording:
-    def __init__(self, frequency: int = 44100, channels = 1, duration = 5):
+    def __init__(self, frequency: int = 44100, channels = 1, duration = 5) -> None:
         self.__data = None
         self.__duration = duration
         self.__frequency = frequency
@@ -13,29 +10,29 @@ class Recording:
         self.__fingerprint = None
     
     @property
-    def data(self):
+    def data(self) -> np.array:
         return self.__data    
     @property
-    def fingerprint(self):
+    def fingerprint(self) -> dict[int, tuple[int, int]]:
         return self.__fingerprint
 
-    def record(self):
+    def record(self) -> None:
         self.__data = sd.rec(int(self.__duration * self.__frequency), self.__frequency, self.__channels)
         
-    def play(self):
+    def play(self) -> None:
         sd.play(self.__data)
         
-    def load(self, path: str):
+    def load(self, path: str) -> None:
         input, _ = librosa.load(path, sr = self.__frequency)
         self.__data = input
         if self.__duration != 0:
             self.__data = self.__data[:self.__duration * self.__frequency]
             
-    def prepareRecording(self):
+    def prepareRecording(self) -> None:
         self.__data = self.__data.flatten()
         self.__data = librosa.util.normalize(self.__data)
     
-    def plotFFT(self, plt):
+    def plotFFT(self, plt) -> None:
         length = len(self.__data)
         fft = scipy.fft.fft(self.__data)
         y = 2.0 / length * np.abs(fft[0:length//2])
@@ -72,7 +69,7 @@ class Recording:
             plt.plot(*zip(*fingerprintMap))   
         return fingerprintMap
     
-    def generateHash(self, plt = None, id = None):
+    def generateHash(self, plt = None, id = None) -> None:
         self.__fingerprint = {}
         
         upperFreq = 23000
